@@ -1,15 +1,19 @@
+use crate::hub::Hub;
+use crate::web_ui_messages::WebUiRequest;
 use anyhow::{anyhow, Result};
 use futures_util::StreamExt;
 use log::debug;
+use std::sync::Arc;
 use tokio::net::{TcpListener, TcpStream};
+use tokio_tungstenite::tungstenite::Message;
 
-use crate::web_ui_messages::WebUiRequest;
-
-pub struct WebUiServer {}
+pub struct WebUiServer {
+    hub: Arc<Hub>,
+}
 
 impl WebUiServer {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(hub: Arc<Hub>) -> Self {
+        Self { hub }
     }
 
     pub async fn listen(&self, addr: &str) -> Result<()> {
@@ -17,9 +21,10 @@ impl WebUiServer {
             .await
             .map_err(|e| anyhow!("WebUi binding failed: {:?}", e))?;
 
+        let hub = self.hub.clone();
         tokio::spawn(async move {
             while let Ok((stream, _)) = ws_listener.accept().await {
-                tokio::spawn(accept_connection(stream));
+                tokio::spawn(accept_connection(stream, hub.clone()));
             }
         })
         .await
@@ -27,7 +32,7 @@ impl WebUiServer {
     }
 }
 
-async fn accept_connection(stream: TcpStream) -> Result<()> {
+async fn accept_connection(stream: TcpStream, hub: Arc<Hub>) -> Result<()> {
     let addr = stream
         .peer_addr()
         .map_err(|_| anyhow!("peer address missing"))?;
@@ -40,7 +45,7 @@ async fn accept_connection(stream: TcpStream) -> Result<()> {
 
     debug!("New WebSocket connection: {}", addr);
 
-    let (_write, mut read) = ws_stream.split();
+    let (mut write, mut read) = ws_stream.split();
 
     loop {
         let message = read.next().await;
@@ -59,9 +64,20 @@ async fn accept_connection(stream: TcpStream) -> Result<()> {
                 match message.to_text() {
                     Ok(message) => {
                         let message: Result<WebUiRequest, _> = serde_json::from_str(message);
+                        debug!("Message received: {:?}", message);
+
                         match message {
                             Ok(message) => {
-                                debug!("Message: {:?}", message);
+                                let response = hub.handle_web_ui_request(&message);
+
+                                let response = serde_json::to_string(&response)
+                                    .map_err(|e| anyhow!("Serialization failed: {}", e))?;
+
+                                use futures_util::SinkExt;
+                                write
+                                    .send(Message::Text(response))
+                                    .await // Blocking receive task
+                                    .map_err(|e| anyhow!("Sending message failed: {}", e))?;
                             }
                             Err(e) => {
                                 debug!("Deserialization failed: {:?}", e);
