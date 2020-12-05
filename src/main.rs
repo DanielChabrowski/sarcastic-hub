@@ -12,7 +12,7 @@ async fn main() {
     let hub = Arc::new(hub::Hub::new());
 
     let web_ui = WebUiServer::new(hub.clone());
-    let web_ui = web_ui.listen("127.0.0.1:9023");
+    let web_ui = web_ui.listen("0:9023");
 
     let _ = tokio::join!(web_ui);
 }
