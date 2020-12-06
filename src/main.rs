@@ -1,4 +1,8 @@
+mod config;
+mod filesystem_provider;
 mod hub;
+mod provider;
+mod resource;
 mod web_ui;
 mod web_ui_messages;
 
@@ -9,10 +13,15 @@ use std::sync::Arc;
 async fn main() {
     env_logger::init();
 
-    let hub = Arc::new(hub::Hub::new());
+    let config = config::load_config("config.json").expect("configuration file read");
+    log::debug!("{:#?}", config);
+
+    let web_ui_address = config.web_ui_address;
+
+    let hub = Arc::new(hub::Hub::new(config));
 
     let web_ui = WebUiServer::new(hub.clone());
-    let web_ui = web_ui.listen("0:9023");
+    let web_ui = web_ui.listen(web_ui_address);
 
     let _ = tokio::join!(web_ui);
 }

@@ -19,7 +19,9 @@ pub enum WebUiRequest {
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub struct Provider {}
+pub struct Provider {
+    pub name: String,
+}
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Resource {}

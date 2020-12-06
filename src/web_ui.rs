@@ -4,7 +4,7 @@ use anyhow::{anyhow, Result};
 use futures_util::StreamExt;
 use log::debug;
 use std::sync::Arc;
-use tokio::net::{TcpListener, TcpStream};
+use tokio::net::{TcpListener, TcpStream, ToSocketAddrs};
 use tokio_tungstenite::tungstenite::Message;
 
 pub struct WebUiServer {
@@ -16,7 +16,7 @@ impl WebUiServer {
         Self { hub }
     }
 
-    pub async fn listen(&self, addr: &str) -> Result<()> {
+    pub async fn listen<A: ToSocketAddrs>(&self, addr: A) -> Result<()> {
         let ws_listener = TcpListener::bind(addr)
             .await
             .map_err(|e| anyhow!("WebUi binding failed: {:?}", e))?;
@@ -68,7 +68,7 @@ async fn accept_connection(stream: TcpStream, hub: Arc<Hub>) -> Result<()> {
 
                         match message {
                             Ok(message) => {
-                                let response = hub.handle_web_ui_request(&message);
+                                let response = hub.handle_web_ui_request(&message).await;
 
                                 let response = serde_json::to_string(&response)
                                     .map_err(|e| anyhow!("Serialization failed: {}", e))?;
