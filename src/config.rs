@@ -9,15 +9,8 @@ pub struct Filesystem {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct Video {
-    pub name: String,
-    pub paths: Vec<String>,
-}
-
-#[derive(Debug, Deserialize)]
 pub enum Provider {
     Filesystem(Filesystem),
-    Video(Video),
 }
 
 #[derive(Debug, Deserialize)]

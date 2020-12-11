@@ -3,6 +3,7 @@ mod filesystem_provider;
 mod hub;
 mod provider;
 mod resource;
+mod resource_manager;
 mod web_ui;
 mod web_ui_messages;
 

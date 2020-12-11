@@ -1,6 +1,7 @@
 use crate::config::{self, Config};
 use crate::filesystem_provider::FilesystemProvider;
 use crate::provider::Provider;
+use crate::resource::Resource;
 use crate::web_ui_messages::{
     self, Action, ProblemDetails, QueryProviders, QueryResources, WebUiRequest, WebUiResponse,
 };
@@ -8,25 +9,28 @@ use std::collections::HashMap;
 use tokio::sync::RwLock;
 
 type Providers = HashMap<String, Box<dyn Provider + Sync + Send>>;
+type Resources = HashMap<String, Resource>;
 
 pub struct Hub {
-    config: Config,
+    _config: Config,
     providers: RwLock<Providers>,
+    resources: RwLock<Resources>,
 }
 
 impl Hub {
     pub fn new(config: Config) -> Self {
         let providers = create_providers(&config);
         Self {
-            config,
+            _config: config,
             providers: RwLock::new(providers),
+            resources: RwLock::new(Resources::new()),
         }
     }
 
     pub async fn handle_web_ui_request(&self, req: &WebUiRequest) -> WebUiResponse {
         match req {
             WebUiRequest::QueryProviders(q) => self.handle_query_providers(q).await,
-            WebUiRequest::QueryResources(q) => self.handle_query_resources(q),
+            WebUiRequest::QueryResources(q) => self.handle_query_resources(q).await,
             WebUiRequest::Action(q) => self.handle_action(q),
         }
     }
@@ -39,6 +43,11 @@ impl Hub {
         }
 
         let providers = &*self.providers.read().await;
+
+        for (_, provider) in providers {
+            provider.fetch().await;
+        }
+
         let providers = providers
             .into_iter()
             .map(|(ref key, _)| web_ui_messages::Provider {
@@ -49,10 +58,23 @@ impl Hub {
         WebUiResponse::Providers(providers.to_vec())
     }
 
-    fn handle_query_resources(&self, _query: &QueryResources) -> WebUiResponse {
-        WebUiResponse::Error(ProblemDetails {
-            description: "QueryResources not implemented".into(),
-        })
+    async fn handle_query_resources(&self, _query: &QueryResources) -> WebUiResponse {
+        let providers = &*self.providers.read().await;
+
+        let mut resources = Vec::new();
+        for (_, provider) in providers {
+            let mut provided: Vec<_> = provider
+                .fetch()
+                .await
+                .iter()
+                .map(|res| web_ui_messages::Resource {
+                    name: res.name.clone(),
+                })
+                .collect();
+            resources.append(&mut provided);
+        }
+
+        WebUiResponse::Resources(resources)
     }
 
     fn handle_action(&self, _query: &Action) -> WebUiResponse {
@@ -68,10 +90,10 @@ fn create_providers(config: &Config) -> Providers {
     for provider in &config.providers {
         match provider {
             config::Provider::Filesystem(p) => {
-                let fs_provider = FilesystemProvider::new(p.name.clone(), p.paths.clone());
+                let fs_provider =
+                    FilesystemProvider::new(p.name.clone(), p.paths.clone(), p.extensions.clone());
                 providers.insert(p.name.clone(), Box::new(fs_provider));
             }
-            _ => {}
         }
     }
 

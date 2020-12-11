@@ -24,7 +24,9 @@ pub struct Provider {
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub struct Resource {}
+pub struct Resource {
+    pub name: String,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProblemDetails {
