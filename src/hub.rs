@@ -1,9 +1,12 @@
-use crate::config::{self, Config};
 use crate::filesystem_provider::FilesystemProvider;
 use crate::provider::Provider;
 use crate::resource::Resource;
 use crate::web_ui_messages::{
     self, Action, ProblemDetails, QueryProviders, QueryResources, WebUiRequest, WebUiResponse,
+};
+use crate::{
+    config::{self, Config},
+    web_ui::WebSocketHandler,
 };
 use std::collections::HashMap;
 use tokio::sync::RwLock;
@@ -24,14 +27,6 @@ impl Hub {
             _config: config,
             providers: RwLock::new(providers),
             resources: RwLock::new(Resources::new()),
-        }
-    }
-
-    pub async fn handle_web_ui_request(&self, req: &WebUiRequest) -> WebUiResponse {
-        match req {
-            WebUiRequest::QueryProviders(q) => self.handle_query_providers(q).await,
-            WebUiRequest::QueryResources(q) => self.handle_query_resources(q).await,
-            WebUiRequest::Action(q) => self.handle_action(q),
         }
     }
 
@@ -98,4 +93,15 @@ fn create_providers(config: &Config) -> Providers {
     }
 
     providers
+}
+
+#[async_trait::async_trait]
+impl WebSocketHandler<WebUiRequest, WebUiResponse> for Hub {
+    async fn handle(&self, req: WebUiRequest) -> WebUiResponse {
+        match req {
+            WebUiRequest::QueryProviders(q) => self.handle_query_providers(&q).await,
+            WebUiRequest::QueryResources(q) => self.handle_query_resources(&q).await,
+            WebUiRequest::Action(q) => self.handle_action(&q),
+        }
+    }
 }

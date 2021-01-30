@@ -1,5 +1,3 @@
-use crate::hub::Hub;
-use crate::web_ui_messages::WebUiRequest;
 use anyhow::{anyhow, Result};
 use futures_util::StreamExt;
 use log::debug;
@@ -7,13 +5,22 @@ use std::sync::Arc;
 use tokio::net::{TcpListener, TcpStream, ToSocketAddrs};
 use tokio_tungstenite::tungstenite::Message;
 
-pub struct WebUiServer {
-    hub: Arc<Hub>,
+#[async_trait::async_trait]
+pub trait WebSocketHandler<Request, Response> {
+    async fn handle(&self, request: Request) -> Response;
 }
 
-impl WebUiServer {
-    pub fn new(hub: Arc<Hub>) -> Self {
-        Self { hub }
+pub struct WebUiServer<Request, Response> {
+    handler: Arc<dyn WebSocketHandler<Request, Response> + Send + Sync>,
+}
+
+impl<Request, Response> WebUiServer<Request, Response>
+where
+    Request: serde::de::DeserializeOwned + Send + Sync + 'static,
+    Response: serde::Serialize + Send + Sync + 'static,
+{
+    pub fn new(handler: Arc<dyn WebSocketHandler<Request, Response> + Send + Sync>) -> Self {
+        Self { handler }
     }
 
     pub async fn listen<A: ToSocketAddrs>(&self, addr: A) -> Result<()> {
@@ -21,10 +28,10 @@ impl WebUiServer {
             .await
             .map_err(|e| anyhow!("WebUi binding failed: {:?}", e))?;
 
-        let hub = self.hub.clone();
+        let handler = self.handler.clone();
         tokio::spawn(async move {
             while let Ok((stream, _)) = ws_listener.accept().await {
-                tokio::spawn(accept_connection(stream, hub.clone()));
+                tokio::spawn(accept_connection(stream, handler.clone()));
             }
         })
         .await
@@ -32,7 +39,14 @@ impl WebUiServer {
     }
 }
 
-async fn accept_connection(stream: TcpStream, hub: Arc<Hub>) -> Result<()> {
+async fn accept_connection<Request, Response>(
+    stream: TcpStream,
+    hub: Arc<dyn WebSocketHandler<Request, Response> + Send + Sync>,
+) -> Result<()>
+where
+    Request: serde::de::DeserializeOwned + Send + Sync,
+    Response: serde::Serialize + Send + Sync,
+{
     let addr = stream
         .peer_addr()
         .map_err(|_| anyhow!("peer address missing"))?;
@@ -63,12 +77,12 @@ async fn accept_connection(stream: TcpStream, hub: Arc<Hub>) -> Result<()> {
 
                 match message.to_text() {
                     Ok(message) => {
-                        let message: Result<WebUiRequest, _> = serde_json::from_str(message);
-                        debug!("Message received: {:?}", message);
+                        let message: Result<Request, _> = serde_json::from_str(message);
+                        // debug!("Message received: {:?}", message);
 
                         match message {
                             Ok(message) => {
-                                let response = hub.handle_web_ui_request(&message).await;
+                                let response = hub.handle(message).await;
 
                                 let response = serde_json::to_string(&response)
                                     .map_err(|e| anyhow!("Serialization failed: {}", e))?;

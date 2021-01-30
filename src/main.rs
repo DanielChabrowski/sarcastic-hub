@@ -9,6 +9,7 @@ mod web_ui_messages;
 
 use crate::web_ui::WebUiServer;
 use std::sync::Arc;
+use web_ui_messages::{WebUiRequest, WebUiResponse};
 
 #[tokio::main]
 async fn main() {
@@ -21,7 +22,7 @@ async fn main() {
 
     let hub = Arc::new(hub::Hub::new(config));
 
-    let web_ui = WebUiServer::new(hub.clone());
+    let web_ui = WebUiServer::<WebUiRequest, WebUiResponse>::new(hub.clone());
     let web_ui = web_ui.listen(web_ui_address);
 
     let _ = tokio::join!(web_ui);
