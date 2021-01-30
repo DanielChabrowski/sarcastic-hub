@@ -10,11 +10,11 @@ pub trait WebSocketHandler<Request, Response> {
     async fn handle(&self, request: Request) -> Response;
 }
 
-pub struct WebUiServer<Request, Response> {
+pub struct WebSocketServer<Request, Response> {
     handler: Arc<dyn WebSocketHandler<Request, Response> + Send + Sync>,
 }
 
-impl<Request, Response> WebUiServer<Request, Response>
+impl<Request, Response> WebSocketServer<Request, Response>
 where
     Request: serde::de::DeserializeOwned + Send + Sync + 'static,
     Response: serde::Serialize + Send + Sync + 'static,

@@ -4,10 +4,10 @@ mod hub;
 mod provider;
 mod resource;
 mod resource_manager;
-mod web_ui;
 mod web_ui_messages;
+mod ws_server;
 
-use crate::web_ui::WebUiServer;
+use crate::ws_server::WebSocketServer;
 use std::sync::Arc;
 use web_ui_messages::{WebUiRequest, WebUiResponse};
 
@@ -22,7 +22,7 @@ async fn main() {
 
     let hub = Arc::new(hub::Hub::new(config));
 
-    let web_ui = WebUiServer::<WebUiRequest, WebUiResponse>::new(hub.clone());
+    let web_ui = WebSocketServer::<WebUiRequest, WebUiResponse>::new(hub.clone());
     let web_ui = web_ui.listen(web_ui_address);
 
     let _ = tokio::join!(web_ui);

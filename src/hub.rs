@@ -6,7 +6,7 @@ use crate::web_ui_messages::{
 };
 use crate::{
     config::{self, Config},
-    web_ui::WebSocketHandler,
+    ws_server::WebSocketHandler,
 };
 use std::collections::HashMap;
 use tokio::sync::RwLock;
