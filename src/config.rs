@@ -16,6 +16,7 @@ pub enum Provider {
 #[derive(Debug, Deserialize)]
 pub struct Config {
     pub web_ui_address: std::net::SocketAddr,
+    pub sink_management_address: std::net::SocketAddr,
 
     pub providers: Vec<Provider>,
 }

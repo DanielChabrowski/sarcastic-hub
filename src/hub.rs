@@ -1,6 +1,7 @@
 use crate::filesystem_provider::FilesystemProvider;
 use crate::provider::Provider;
 use crate::resource::Resource;
+use crate::sink_management_messages::{SinkRequest, SinkResponse};
 use crate::web_ui_messages::{
     self, Action, ProblemDetails, QueryProviders, QueryResources, WebUiRequest, WebUiResponse,
 };
@@ -103,5 +104,12 @@ impl WebSocketHandler<WebUiRequest, WebUiResponse> for Hub {
             WebUiRequest::QueryResources(q) => self.handle_query_resources(&q).await,
             WebUiRequest::Action(q) => self.handle_action(&q),
         }
+    }
+}
+
+#[async_trait::async_trait]
+impl WebSocketHandler<SinkRequest, SinkResponse> for Hub {
+    async fn handle(&self, _req: SinkRequest) -> SinkResponse {
+        SinkResponse::Dummy
     }
 }
