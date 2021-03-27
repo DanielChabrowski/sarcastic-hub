@@ -41,6 +41,7 @@ impl Provider for FilesystemProvider {
 
                             if allowed_extension {
                                 resources.push(Resource {
+                                    uuid: uuid::Uuid::new_v4(),
                                     name: p
                                         .strip_prefix(path)
                                         .unwrap()

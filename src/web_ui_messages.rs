@@ -8,7 +8,8 @@ pub struct QueryResources {}
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct Action {
-    command: String,
+    pub resource_uuid: uuid::Uuid,
+    pub command: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -25,6 +26,7 @@ pub struct Provider {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Resource {
+    pub uuid: uuid::Uuid,
     pub name: String,
 }
 

@@ -9,16 +9,16 @@ use crate::{
     config::{self, Config},
     ws_server::WebSocketHandler,
 };
-use std::collections::HashMap;
+use std::{collections::HashMap, sync::Arc};
 use tokio::sync::RwLock;
 
 type Providers = HashMap<String, Box<dyn Provider + Sync + Send>>;
-type Resources = HashMap<String, Resource>;
+type Resources = HashMap<uuid::Uuid, Resource>;
 
 pub struct Hub {
     _config: Config,
     providers: RwLock<Providers>,
-    resources: RwLock<Resources>,
+    resources: Arc<RwLock<Resources>>,
 }
 
 impl Hub {
@@ -27,7 +27,7 @@ impl Hub {
         Self {
             _config: config,
             providers: RwLock::new(providers),
-            resources: RwLock::new(Resources::new()),
+            resources: Arc::new(RwLock::new(Resources::new())),
         }
     }
 
@@ -59,21 +59,45 @@ impl Hub {
 
         let mut resources = Vec::new();
         for (_, provider) in providers {
-            let mut provided: Vec<_> = provider
-                .fetch()
-                .await
-                .iter()
+            let provided: Vec<_> = provider.fetch().await;
+
+            {
+                let mut resources = self.resources.write().await;
+                for resource in &provided {
+                    resources.insert(resource.uuid, resource.clone());
+                }
+            }
+
+            let mut provided = provided
+                .into_iter()
                 .map(|res| web_ui_messages::Resource {
-                    name: res.name.clone(),
+                    uuid: res.uuid,
+                    name: res.name,
                 })
                 .collect();
+
             resources.append(&mut provided);
         }
 
         WebUiResponse::Resources(resources)
     }
 
-    fn handle_action(&self, _query: &Action) -> WebUiResponse {
+    async fn handle_action(&self, query: &Action) -> WebUiResponse {
+        let resources = self.resources.read().await;
+        let resource = resources.get(&query.resource_uuid);
+
+        match resource {
+            Some(r) => {
+                log::debug!("Received action for resource {:?}", r);
+            }
+            None => {
+                log::debug!(
+                    "Could not find a resource identified by {}",
+                    query.resource_uuid
+                );
+            }
+        }
+
         WebUiResponse::Error(ProblemDetails {
             description: "Action not implemented".into(),
         })
@@ -102,14 +126,15 @@ impl WebSocketHandler<WebUiRequest, WebUiResponse> for Hub {
         match req {
             WebUiRequest::QueryProviders(q) => self.handle_query_providers(&q).await,
             WebUiRequest::QueryResources(q) => self.handle_query_resources(&q).await,
-            WebUiRequest::Action(q) => self.handle_action(&q),
+            WebUiRequest::Action(q) => self.handle_action(&q).await,
         }
     }
 }
 
 #[async_trait::async_trait]
 impl WebSocketHandler<SinkRequest, SinkResponse> for Hub {
-    async fn handle(&self, _req: SinkRequest) -> SinkResponse {
+    async fn handle(&self, req: SinkRequest) -> SinkResponse {
+        log::debug!("{:?}", req);
         SinkResponse::Dummy
     }
 }
