@@ -1,8 +1,10 @@
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use futures_util::StreamExt;
-use log::debug;
+use log::{debug, warn};
 use std::sync::Arc;
 use tokio::net::{TcpListener, TcpStream, ToSocketAddrs};
+use tokio::sync::mpsc::unbounded_channel as channel;
+use tokio_stream::wrappers::UnboundedReceiverStream;
 use tokio_tungstenite::tungstenite::Message;
 
 #[async_trait::async_trait]
@@ -61,53 +63,65 @@ where
 
     let (mut write, mut read) = ws_stream.split();
 
+    let (tx, rx) = channel::<Response>();
+    let mut rx = UnboundedReceiverStream::new(rx);
+
     loop {
-        let message = read.next().await;
+        tokio::select! {
+            Some(request) = rx.next() => {
+                let request = serde_json::to_string(&request)
+                    .with_context(|| format!("Message serialization failed"));
 
-        if message.is_none() {
-            debug!("Couldn't read next message");
-            break;
-        }
-
-        match message.unwrap() {
-            Ok(message) => {
-                if message.is_close() {
-                    break;
+                match request {
+                    Ok(request) => {
+                        use futures_util::SinkExt;
+                        if let Err(e) = write.send(Message::Text(request)).await {
+                            warn!("Message could not be sent: {:?}", e);
+                        }
+                    }
+                    Err(e) => {
+                        warn!("Message serialization failed: {:?}", e);
+                    }
                 }
 
-                match message.to_text() {
+
+            }
+            Some(message) = read.next() => {
+                match message {
                     Ok(message) => {
-                        let message: Result<Request, _> = serde_json::from_str(message);
-                        // debug!("Message received: {:?}", message);
+                        if message.is_close() {
+                            break
+                        }
 
-                        match message {
+                        match message.to_text() {
                             Ok(message) => {
-                                let response = hub.handle(message).await;
+                                let message: Result<Request, _> = serde_json::from_str(message);
+                                // debug!("Message received: {:?}", message);
 
-                                let response = serde_json::to_string(&response)
-                                    .map_err(|e| anyhow!("Serialization failed: {}", e))?;
-
-                                use futures_util::SinkExt;
-                                write
-                                    .send(Message::Text(response))
-                                    .await // Blocking receive task
-                                    .map_err(|e| anyhow!("Sending message failed: {}", e))?;
+                                match message {
+                                    Ok(message) => {
+                                        let response = hub.handle(message).await;
+                                        tx.send(response).ok();
+                                    }
+                                    Err(e) => {
+                                        debug!("Deserialization failed: {:?}", e);
+                                    }
+                                }
                             }
                             Err(e) => {
-                                debug!("Deserialization failed: {:?}", e);
+                                debug!("Message is not in text format: {:?}", e);
                             }
                         }
                     }
                     Err(e) => {
-                        debug!("Message is not in text format: {:?}", e);
+                        debug!("Could not retrieve message: {:?}", e);
                     }
                 }
             }
-            Err(e) => {
-                debug!("Invalid message: {:?}", e);
-            }
-        }
+        };
     }
+
+    // Remove a connection
 
     debug!("Connection to {} closed", addr);
 

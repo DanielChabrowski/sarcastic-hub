@@ -17,6 +17,12 @@ use web_ui_messages::{WebUiRequest, WebUiResponse};
 async fn main() {
     env_logger::init();
 
+    log::info!(
+        "Starting {} {}",
+        env!("CARGO_PKG_NAME"),
+        env!("CARGO_PKG_VERSION")
+    );
+
     let config = config::load_config("config.json").expect("configuration file read");
     log::debug!("{:#?}", config);
 
