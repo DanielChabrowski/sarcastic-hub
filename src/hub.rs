@@ -40,12 +40,12 @@ impl Hub {
 
         let providers = &*self.providers.read().await;
 
-        for (_, provider) in providers {
+        for provider in providers.values() {
             provider.fetch().await;
         }
 
         let providers = providers
-            .into_iter()
+            .iter()
             .map(|(ref key, _)| web_ui_messages::Provider {
                 name: key.as_str().to_string(),
             })
@@ -58,7 +58,7 @@ impl Hub {
         let providers = &*self.providers.read().await;
 
         let mut resources = Vec::new();
-        for (_, provider) in providers {
+        for provider in providers.values() {
             let provided: Vec<_> = provider.fetch().await;
 
             {
