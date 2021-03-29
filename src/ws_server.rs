@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, Result};
 use futures_util::StreamExt;
 use log::{debug, warn};
 use std::sync::Arc;
@@ -69,9 +69,7 @@ where
     loop {
         tokio::select! {
             Some(request) = rx.next() => {
-                let request = serde_json::to_string(&request)
-                    .with_context(|| format!("Message serialization failed"));
-
+                let request = serde_json::to_string(&request);
                 match request {
                     Ok(request) => {
                         use futures_util::SinkExt;
