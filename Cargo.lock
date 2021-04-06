@@ -539,6 +539,7 @@ dependencies = [
  "env_logger",
  "futures-util",
  "log",
+ "scopeguard",
  "serde",
  "serde_json",
  "tokio",

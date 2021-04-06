@@ -129,6 +129,17 @@ impl WebSocketHandler<WebUiRequest, WebUiResponse> for Hub {
             WebUiRequest::Action(q) => self.handle_action(&q).await,
         }
     }
+
+    fn add_connection(
+        &self,
+        _sender: tokio::sync::mpsc::UnboundedSender<WebUiResponse>,
+    ) -> uuid::Uuid {
+        uuid::Uuid::new_v4()
+    }
+
+    fn remove_connection(&self, _id: uuid::Uuid) {
+        todo!()
+    }
 }
 
 #[async_trait::async_trait]
@@ -136,5 +147,16 @@ impl WebSocketHandler<SinkRequest, SinkResponse> for Hub {
     async fn handle(&self, req: SinkRequest) -> SinkResponse {
         log::debug!("{:?}", req);
         SinkResponse::Dummy
+    }
+
+    fn add_connection(
+        &self,
+        _sender: tokio::sync::mpsc::UnboundedSender<SinkResponse>,
+    ) -> uuid::Uuid {
+        uuid::Uuid::new_v4()
+    }
+
+    fn remove_connection(&self, _id: uuid::Uuid) {
+        todo!()
     }
 }

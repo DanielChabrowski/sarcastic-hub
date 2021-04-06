@@ -4,12 +4,16 @@ use log::{debug, warn};
 use std::sync::Arc;
 use tokio::net::{TcpListener, TcpStream, ToSocketAddrs};
 use tokio::sync::mpsc::unbounded_channel as channel;
+use tokio::sync::mpsc::UnboundedSender as Sender;
 use tokio_stream::wrappers::UnboundedReceiverStream;
 use tokio_tungstenite::tungstenite::Message;
 
 #[async_trait::async_trait]
 pub trait WebSocketHandler<Request, Response> {
     async fn handle(&self, request: Request) -> Response;
+
+    fn add_connection(&self, sender: Sender<Response>) -> uuid::Uuid;
+    fn remove_connection(&self, id: uuid::Uuid);
 }
 
 pub struct WebSocketServer<Request, Response> {
@@ -65,6 +69,11 @@ where
 
     let (tx, rx) = channel::<Response>();
     let mut rx = UnboundedReceiverStream::new(rx);
+
+    let connection_id = hub.add_connection(tx.clone());
+    scopeguard::defer! {
+        hub.remove_connection(connection_id);
+    }
 
     loop {
         tokio::select! {
