@@ -29,7 +29,10 @@ impl Provider for FilesystemProvider {
         let mut resources = Vec::new();
 
         for path in &self.paths {
-            for entry in WalkDir::new(path).into_iter() {
+            for entry in WalkDir::new(path)
+                .sort_by_key(|a| a.file_name().to_owned())
+                .into_iter()
+            {
                 match entry {
                     Ok(entry) => {
                         let p = entry.path();
