@@ -10,15 +10,18 @@ use crate::{
     ws_server::WebSocketHandler,
 };
 use std::{collections::HashMap, sync::Arc};
+use tokio::sync::mpsc::UnboundedSender as Sender;
 use tokio::sync::RwLock;
 
 type Providers = HashMap<String, Box<dyn Provider + Sync + Send>>;
 type Resources = HashMap<uuid::Uuid, Resource>;
+type WebClients = HashMap<uuid::Uuid, Sender<WebUiResponse>>;
 
 pub struct Hub {
     _config: Config,
     providers: RwLock<Providers>,
     resources: Arc<RwLock<Resources>>,
+    web_clients: Arc<RwLock<WebClients>>,
 }
 
 impl Hub {
@@ -28,6 +31,7 @@ impl Hub {
             _config: config,
             providers: RwLock::new(providers),
             resources: Arc::new(RwLock::new(Resources::new())),
+            web_clients: Arc::new(RwLock::new(WebClients::new())),
         }
     }
 
@@ -130,15 +134,19 @@ impl WebSocketHandler<WebUiRequest, WebUiResponse> for Hub {
         }
     }
 
-    fn add_connection(
+    async fn add_connection(
         &self,
-        _sender: tokio::sync::mpsc::UnboundedSender<WebUiResponse>,
+        sender: tokio::sync::mpsc::UnboundedSender<WebUiResponse>,
     ) -> uuid::Uuid {
-        uuid::Uuid::new_v4()
+        let uid = uuid::Uuid::new_v4();
+        log::debug!("Adding new web client {}", uid);
+        self.web_clients.write().await.insert(uid, sender);
+        uid
     }
 
-    fn remove_connection(&self, _id: uuid::Uuid) {
-        todo!()
+    async fn remove_connection(&self, uid: uuid::Uuid) {
+        log::debug!("Removing web client {}", uid);
+        self.web_clients.write().await.remove(&uid);
     }
 }
 
@@ -149,14 +157,14 @@ impl WebSocketHandler<SinkRequest, SinkResponse> for Hub {
         SinkResponse::Dummy
     }
 
-    fn add_connection(
+    async fn add_connection(
         &self,
         _sender: tokio::sync::mpsc::UnboundedSender<SinkResponse>,
     ) -> uuid::Uuid {
         uuid::Uuid::new_v4()
     }
 
-    fn remove_connection(&self, _id: uuid::Uuid) {
+    async fn remove_connection(&self, _id: uuid::Uuid) {
         todo!()
     }
 }

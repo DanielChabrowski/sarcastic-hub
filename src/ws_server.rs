@@ -11,9 +11,8 @@ use tokio_tungstenite::tungstenite::Message;
 #[async_trait::async_trait]
 pub trait WebSocketHandler<Request, Response> {
     async fn handle(&self, request: Request) -> Response;
-
-    fn add_connection(&self, sender: Sender<Response>) -> uuid::Uuid;
-    fn remove_connection(&self, id: uuid::Uuid);
+    async fn add_connection(&self, sender: Sender<Response>) -> uuid::Uuid;
+    async fn remove_connection(&self, id: uuid::Uuid);
 }
 
 pub struct WebSocketServer<Request, Response> {
@@ -70,10 +69,7 @@ where
     let (tx, rx) = channel::<Response>();
     let mut rx = UnboundedReceiverStream::new(rx);
 
-    let connection_id = hub.add_connection(tx.clone());
-    scopeguard::defer! {
-        hub.remove_connection(connection_id);
-    }
+    let connection_id = hub.add_connection(tx.clone()).await;
 
     loop {
         tokio::select! {
@@ -128,7 +124,7 @@ where
         };
     }
 
-    // Remove a connection
+    hub.remove_connection(connection_id).await;
 
     debug!("Connection to {} closed", addr);
 
