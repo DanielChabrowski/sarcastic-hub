@@ -1,13 +1,13 @@
 use crate::filesystem_provider::FilesystemProvider;
 use crate::provider::Provider;
 use crate::resource::Resource;
-use crate::sink_management_messages::{SinkRequest, SinkResponse};
-use crate::web_ui_messages::{
-    self, Action, ProblemDetails, QueryProviders, QueryResources, WebUiRequest, WebUiResponse,
-};
 use crate::{
     config::{self, Config},
     ws_server::WebSocketHandler,
+};
+use messages::sink_management_messages::{SinkRequest, SinkResponse};
+use messages::web_ui_messages::{
+    self, Action, ProblemDetails, QueryProviders, QueryResources, WebUiRequest, WebUiResponse,
 };
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::mpsc::UnboundedSender as Sender;

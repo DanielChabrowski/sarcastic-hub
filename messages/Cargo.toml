@@ -1,0 +1,9 @@
+[package]
+name = "sarcastic-messages"
+version = "0.1.0"
+authors = ["Daniel Chabrowski <danchabrowski@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+serde = { version = "1", features = [ "derive" ] }
+uuid = { version = "0.8", features = [ "v4", "serde" ] }

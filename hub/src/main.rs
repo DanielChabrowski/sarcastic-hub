@@ -4,14 +4,14 @@ mod hub;
 mod provider;
 mod resource;
 mod resource_manager;
-mod sink_management_messages;
-mod web_ui_messages;
 mod ws_server;
 
 use crate::ws_server::WebSocketServer;
-use sink_management_messages::{SinkRequest, SinkResponse};
+use messages::{
+    sink_management_messages::{SinkRequest, SinkResponse},
+    web_ui_messages::{WebUiRequest, WebUiResponse},
+};
 use std::sync::Arc;
-use web_ui_messages::{WebUiRequest, WebUiResponse};
 
 #[tokio::main]
 async fn main() {

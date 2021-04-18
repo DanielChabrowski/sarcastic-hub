@@ -888,6 +888,7 @@ dependencies = [
  "env_logger",
  "futures-util",
  "log",
+ "sarcastic-messages",
  "serde",
  "serde_json",
  "tokio",
@@ -895,6 +896,14 @@ dependencies = [
  "tokio-tungstenite",
  "uuid",
  "walkdir",
+]
+
+[[package]]
+name = "sarcastic-messages"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "uuid",
 ]
 
 [[package]]
