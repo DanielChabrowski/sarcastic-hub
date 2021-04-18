@@ -161,10 +161,12 @@ impl WebSocketHandler<SinkRequest, SinkResponse> for Hub {
         &self,
         _sender: tokio::sync::mpsc::UnboundedSender<SinkResponse>,
     ) -> uuid::Uuid {
-        uuid::Uuid::new_v4()
+        let uid = uuid::Uuid::new_v4();
+        log::debug!("Adding new sink {}", uid);
+        uid
     }
 
-    async fn remove_connection(&self, _id: uuid::Uuid) {
-        todo!()
+    async fn remove_connection(&self, uid: uuid::Uuid) {
+        log::debug!("Removing sink: {}", uid);
     }
 }
