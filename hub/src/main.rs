@@ -8,8 +8,8 @@ mod ws_server;
 
 use crate::ws_server::WebSocketServer;
 use messages::{
-    sink_management_messages::{SinkRequest, SinkResponse},
-    web_ui_messages::{WebUiRequest, WebUiResponse},
+    sink_management::{SinkRequest, SinkResponse},
+    web_interface::{WebUiRequest, WebUiResponse},
 };
 use std::sync::Arc;
 

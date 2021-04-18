@@ -1,2 +1,2 @@
-pub mod sink_management_messages;
-pub mod web_ui_messages;
+pub mod sink_management;
+pub mod web_interface;

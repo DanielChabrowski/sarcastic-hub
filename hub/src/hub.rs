@@ -5,8 +5,8 @@ use crate::{
     config::{self, Config},
     ws_server::WebSocketHandler,
 };
-use messages::sink_management_messages::{SinkRequest, SinkResponse};
-use messages::web_ui_messages::{
+use messages::sink_management::{SinkRequest, SinkResponse};
+use messages::web_interface::{
     self, Action, ProblemDetails, QueryProviders, QueryResources, WebUiRequest, WebUiResponse,
 };
 use std::{collections::HashMap, sync::Arc};
@@ -50,10 +50,10 @@ impl Hub {
 
         let providers = providers
             .iter()
-            .map(|(ref key, _)| web_ui_messages::Provider {
+            .map(|(ref key, _)| web_interface::Provider {
                 name: key.as_str().to_string(),
             })
-            .collect::<Vec<web_ui_messages::Provider>>();
+            .collect::<Vec<web_interface::Provider>>();
 
         WebUiResponse::Providers(providers.to_vec())
     }
@@ -74,7 +74,7 @@ impl Hub {
 
             let mut provided = provided
                 .into_iter()
-                .map(|res| web_ui_messages::Resource {
+                .map(|res| web_interface::Resource {
                     uuid: res.uuid,
                     name: res.name,
                 })
