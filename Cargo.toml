@@ -1,7 +1,7 @@
 [workspace]
 
 members = [
-	"hub",
+    "hub",
 	"audio-sink",
 	"messages",
 ]
