@@ -7,9 +7,10 @@ pub struct QueryProviders {}
 pub struct QueryResources {}
 
 #[derive(Debug, Clone, Deserialize)]
-pub struct Action {
-    pub resource_uuid: uuid::Uuid,
-    pub command: String,
+pub enum Action {
+    Play(uuid::Uuid),
+    Stop,
+    Pause,
 }
 
 #[derive(Debug, Clone, Deserialize)]

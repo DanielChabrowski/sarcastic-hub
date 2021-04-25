@@ -16,12 +16,14 @@ use tokio::sync::RwLock;
 type Providers = HashMap<String, Box<dyn Provider + Sync + Send>>;
 type Resources = HashMap<uuid::Uuid, Resource>;
 type WebClients = HashMap<uuid::Uuid, Sender<WebUiResponse>>;
+type Sinks = HashMap<uuid::Uuid, Sender<SinkResponse>>;
 
 pub struct Hub {
     _config: Config,
     providers: RwLock<Providers>,
     resources: Arc<RwLock<Resources>>,
     web_clients: Arc<RwLock<WebClients>>,
+    sinks: Arc<RwLock<Sinks>>,
 }
 
 impl Hub {
@@ -32,6 +34,7 @@ impl Hub {
             providers: RwLock::new(providers),
             resources: Arc::new(RwLock::new(Resources::new())),
             web_clients: Arc::new(RwLock::new(WebClients::new())),
+            sinks: Arc::new(RwLock::new(Sinks::new())),
         }
     }
 
@@ -87,18 +90,36 @@ impl Hub {
     }
 
     async fn handle_action(&self, query: &Action) -> WebUiResponse {
-        let resources = self.resources.read().await;
-        let resource = resources.get(&query.resource_uuid);
+        match query {
+            Action::Play(uid) => {
+                let resources = self.resources.read().await;
+                let resource = resources.get(&uid);
 
-        match resource {
-            Some(r) => {
-                log::debug!("Received action for resource {:?}", r);
+                match resource {
+                    Some(r) => {
+                        log::debug!("Received action for resource {:?}", r);
+                        let msg = SinkResponse::Play(r.path.clone());
+
+                        let sinks = self.sinks.read().await;
+                        let (_uid, sender) = sinks.iter().next().unwrap();
+                        sender.send(msg).expect("Message sent to sink");
+                    }
+                    None => {
+                        log::debug!("Could not find a resource identified by {}", uid);
+                    }
+                }
             }
-            None => {
-                log::debug!(
-                    "Could not find a resource identified by {}",
-                    query.resource_uuid
-                );
+            Action::Stop => {
+                let msg = SinkResponse::Stop;
+                let sinks = self.sinks.read().await;
+                let (_uid, sender) = sinks.iter().next().unwrap();
+                sender.send(msg).expect("Message sent to sink");
+            }
+            Action::Pause => {
+                let msg = SinkResponse::Pause;
+                let sinks = self.sinks.read().await;
+                let (_uid, sender) = sinks.iter().next().unwrap();
+                sender.send(msg).expect("Message sent to sink");
             }
         }
 
@@ -159,14 +180,16 @@ impl WebSocketHandler<SinkRequest, SinkResponse> for Hub {
 
     async fn add_connection(
         &self,
-        _sender: tokio::sync::mpsc::UnboundedSender<SinkResponse>,
+        sender: tokio::sync::mpsc::UnboundedSender<SinkResponse>,
     ) -> uuid::Uuid {
         let uid = uuid::Uuid::new_v4();
         log::debug!("Adding new sink {}", uid);
+        self.sinks.write().await.insert(uid, sender);
         uid
     }
 
     async fn remove_connection(&self, uid: uuid::Uuid) {
         log::debug!("Removing sink: {}", uid);
+        self.sinks.write().await.remove(&uid);
     }
 }

@@ -99,7 +99,6 @@ where
                         match message.to_text() {
                             Ok(message) => {
                                 let message: Result<Request, _> = serde_json::from_str(message);
-                                // debug!("Message received: {:?}", message);
 
                                 match message {
                                     Ok(message) => {

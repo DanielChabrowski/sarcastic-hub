@@ -1,14 +1,18 @@
 mod pulsewatcher;
 use pulsewatcher::{PulseMessage, PulseWatcher};
 
-use futures_util::SinkExt;
+mod player;
+use player::Player;
+
+use anyhow::Result;
 use futures_util::StreamExt;
-use gstreamer::prelude::*;
-use log::{debug, error, info};
+use log::{debug, error, info, warn};
+use messages::sink_management::SinkResponse;
 use tokio::sync::mpsc::unbounded_channel as channel;
+use tokio_tungstenite::tungstenite::Message;
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<()> {
     if cfg!(debug_assertions) {
         env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("debug")).init();
     } else {
@@ -21,43 +25,16 @@ async fn main() {
         env!("CARGO_PKG_VERSION")
     );
 
-    let player = gstreamer_player::Player::new(None, None);
-    player.connect_error(|_, err| {
-        error!("{:?}", err);
-    });
-
-    player.connect_state_changed(|p, _err| {
-        debug!("state changed: {:?}", p);
-    });
-
-    player.connect_buffering(|_, p| {
-        debug!("buffering {}", p);
-    });
-
-    use glib::GString;
-
-    let pipeline = player.get_pipeline();
-
-    let pulsesink = gstreamer::ElementFactory::make("pulsesink", Some("dantesink")).unwrap();
-
-    pulsesink.connect_notify(Some("current-device"), |zelf, _| {
-        let current_device = zelf.get_property("current-device").unwrap();
-        debug!(
-            "Current device: {:?}",
-            current_device.get::<GString>().unwrap().unwrap().as_str()
-        );
-    });
-
-    pipeline.set_property("audio-sink", &pulsesink).unwrap();
-
-    player.play();
-
     let (sender, mut receiver) = channel::<PulseMessage>();
 
     let pulse_audio_connection = tokio::task::spawn_blocking(move || {
         let pulse_watcher = PulseWatcher::new(sender).unwrap();
         pulse_watcher.run().unwrap()
     });
+
+    let player = Player::new()?;
+    player.set_uri("file:///home/dante/Music/test.flac");
+    player.play();
 
     let server = tokio::spawn(async move {
         while let Some(msg) = receiver.recv().await {
@@ -75,16 +52,42 @@ async fn main() {
 
     let hub_connection = tokio::spawn(async move {
         while let Some(msg) = ws_read.next().await {
-            debug!("Message from Hub: {:?}", msg);
+            match msg {
+                Ok(msg) => match msg {
+                    Message::Text(msg) => {
+                        let msg: SinkResponse = serde_json::from_str(&msg).unwrap();
+                        debug!("Received message: {:?}", msg);
+
+                        match msg {
+                            SinkResponse::Play(path) => {
+                                player.set_uri(&format!("file://{}", path.to_str().unwrap()));
+                                player.play();
+                            }
+                            SinkResponse::Pause => {
+                                player.pause();
+                            }
+                            SinkResponse::Stop => {
+                                player.stop();
+                            }
+                            SinkResponse::Dummy => {}
+                        }
+                    }
+                    Message::Close(close_frame) => {
+                        debug!("Closing HubConnection: {:?}", close_frame);
+                        break;
+                    }
+                    _ => {
+                        warn!("HubConnection unsupported message type");
+                    }
+                },
+                Err(e) => {
+                    error!("HubConnection WebSocket error: {:?}", e);
+                }
+            }
         }
     });
 
-    ws_write
-        .send(tokio_tungstenite::tungstenite::Message::Text(
-            "{ \"Register\": { \"name\": \"audio-sink\" } }".into(),
-        ))
-        .await
-        .expect("Message send");
+    tokio::try_join!(server, hub_connection, pulse_audio_connection)?;
 
-    tokio::try_join!(server, hub_connection, pulse_audio_connection).expect("Joined");
+    Ok(())
 }

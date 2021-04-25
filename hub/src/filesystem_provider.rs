@@ -51,6 +51,7 @@ impl Provider for FilesystemProvider {
                                         .to_str()
                                         .unwrap()
                                         .to_string(),
+                                    path: p.to_path_buf(),
                                 })
                             }
                         }
