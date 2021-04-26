@@ -117,6 +117,7 @@ where
                     }
                     Err(e) => {
                         debug!("Could not retrieve message: {:?}", e);
+                        break;
                     }
                 }
             }
