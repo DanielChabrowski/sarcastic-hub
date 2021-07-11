@@ -33,8 +33,6 @@ async fn main() -> Result<()> {
     });
 
     let player = Player::new()?;
-    player.set_uri("file:///home/dante/Music/test.flac");
-    player.play();
 
     let server = tokio::spawn(async move {
         while let Some(msg) = receiver.recv().await {
