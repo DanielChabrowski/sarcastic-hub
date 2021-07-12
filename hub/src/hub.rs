@@ -13,7 +13,7 @@ use std::{collections::HashMap, sync::Arc};
 use tokio::sync::mpsc::UnboundedSender as Sender;
 use tokio::sync::RwLock;
 
-type Providers = HashMap<String, Box<dyn Provider + Sync + Send>>;
+type Providers = Vec<Box<dyn Provider + Sync + Send>>;
 type Resources = HashMap<uuid::Uuid, Resource>;
 type WebClients = HashMap<uuid::Uuid, Sender<WebUiResponse>>;
 type Sinks = HashMap<uuid::Uuid, Sender<SinkResponse>>;
@@ -45,16 +45,11 @@ impl Hub {
             });
         }
 
-        let providers = &*self.providers.read().await;
-
-        for provider in providers.values() {
-            provider.fetch().await;
-        }
-
+        let providers = self.providers.read().await;
         let providers = providers
             .iter()
-            .map(|(ref key, _)| web_interface::Provider {
-                name: key.as_str().to_string(),
+            .map(|ref v| web_interface::Provider {
+                name: v.get_name().to_string(),
             })
             .collect::<Vec<web_interface::Provider>>();
 
@@ -62,10 +57,10 @@ impl Hub {
     }
 
     async fn handle_query_resources(&self, _query: &QueryResources) -> WebUiResponse {
-        let providers = &*self.providers.read().await;
+        let providers = self.providers.read().await;
 
         let mut resources = Vec::new();
-        for provider in providers.values() {
+        for provider in &*providers {
             let provided: Vec<_> = provider.fetch().await;
 
             {
@@ -137,7 +132,7 @@ fn create_providers(config: &Config) -> Providers {
             config::Provider::Filesystem(p) => {
                 let fs_provider =
                     FilesystemProvider::new(p.name.clone(), p.paths.clone(), p.extensions.clone());
-                providers.insert(p.name.clone(), Box::new(fs_provider));
+                providers.push(Box::new(fs_provider));
             }
         }
     }

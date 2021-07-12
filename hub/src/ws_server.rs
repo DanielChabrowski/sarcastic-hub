@@ -31,7 +31,7 @@ where
     pub async fn listen<A: ToSocketAddrs>(&self, addr: A) -> Result<()> {
         let ws_listener = TcpListener::bind(addr)
             .await
-            .map_err(|e| anyhow!("WebUi binding failed: {:?}", e))?;
+            .map_err(|e| anyhow!("Binding failed: {:?}", e))?;
 
         let handler = self.handler.clone();
         tokio::spawn(async move {
