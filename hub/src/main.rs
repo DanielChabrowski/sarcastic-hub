@@ -6,7 +6,7 @@ mod resource;
 mod resource_manager;
 mod ws_server;
 
-use crate::ws_server::{WebSocketHandler, WebSocketServer};
+use crate::ws_server::WebSocketServer;
 use messages::{
     sink_management::{SinkRequest, SinkResponse},
     web_interface::{WebUiRequest, WebUiResponse},

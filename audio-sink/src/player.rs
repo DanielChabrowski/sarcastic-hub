@@ -4,7 +4,7 @@ use log::{debug, error};
 
 pub struct Player {
     inner: gstreamer_player::Player,
-    sink: gstreamer::Element,
+    _sink: gstreamer::Element,
 }
 
 impl Player {
@@ -27,18 +27,18 @@ impl Player {
         });
 
         inner.connect_notify(Some("current-device"), |zelf, _| {
-            let current_device = zelf.get_property("current-device").unwrap();
+            let current_device = zelf.property("current-device").unwrap();
             use glib::GString;
             debug!(
                 "current device changed: {:?}",
-                current_device.get::<GString>().unwrap().unwrap().as_str()
+                current_device.get::<GString>().unwrap().as_str()
             );
         });
 
-        let pipeline = inner.get_pipeline();
+        let pipeline = inner.pipeline();
         pipeline.set_property("audio-sink", &sink)?;
 
-        Ok(Self { inner, sink })
+        Ok(Self { inner, _sink: sink })
     }
 
     pub fn set_uri(&self, uri: &str) {
@@ -57,13 +57,13 @@ impl Player {
         self.inner.pause();
     }
 
-    pub fn set_volume(&self, volume: f64) {
-        self.inner.set_volume(volume);
-    }
+    // pub fn set_volume(&self, volume: f64) {
+    //     self.inner.set_volume(volume);
+    // }
 
-    pub fn set_audio_device(&self, device_name: impl ToString) {
-        self.sink
-            .set_property("device", &device_name.to_string())
-            .unwrap();
-    }
+    // pub fn set_audio_device(&self, device_name: impl ToString) {
+    //     self.sink
+    //         .set_property("device", &device_name.to_string())
+    //         .unwrap();
+    // }
 }
