@@ -6,7 +6,7 @@ mod resource;
 mod resource_manager;
 mod ws_server;
 
-use crate::ws_server::WebSocketServer;
+use crate::ws_server::{WebSocketHandler, WebSocketServer};
 use messages::{
     sink_management::{SinkRequest, SinkResponse},
     web_interface::{WebUiRequest, WebUiResponse},
@@ -14,7 +14,7 @@ use messages::{
 use std::sync::Arc;
 
 #[tokio::main]
-async fn main() {
+async fn main() -> anyhow::Result<()> {
     if cfg!(debug_assertions) {
         env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("debug")).init();
     } else {
@@ -38,8 +38,10 @@ async fn main() {
     let web_ui = WebSocketServer::<WebUiRequest, WebUiResponse>::new(hub.clone());
     let web_ui = web_ui.listen(web_ui_address);
 
-    let sink_management = WebSocketServer::<SinkRequest, SinkResponse>::new(hub.clone());
+    let sink_management = WebSocketServer::<SinkRequest, SinkResponse>::new(hub);
     let sink_management = sink_management.listen(sink_management_address);
 
-    let _ = tokio::join!(sink_management, web_ui);
+    tokio::try_join!(sink_management, web_ui)?;
+
+    Ok(())
 }

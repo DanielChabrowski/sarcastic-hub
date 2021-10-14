@@ -15,9 +15,16 @@ pub enum Action {
 
 #[derive(Debug, Clone, Deserialize)]
 pub enum WebUiRequest {
+    QuerySinks,
     QueryProviders(QueryProviders),
     QueryResources(QueryResources),
     Action(Action),
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct Sink {
+    pub uid: uuid::Uuid,
+    pub name: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -38,6 +45,7 @@ pub struct ProblemDetails {
 
 #[derive(Debug, Clone, Serialize)]
 pub enum WebUiResponse {
+    Sinks(Vec<Sink>),
     Providers(Vec<Provider>),
     Resources(Vec<Resource>),
     Error(ProblemDetails),

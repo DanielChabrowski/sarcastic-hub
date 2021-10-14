@@ -10,7 +10,7 @@ use tokio_tungstenite::tungstenite::Message;
 
 #[async_trait::async_trait]
 pub trait WebSocketHandler<Request, Response> {
-    async fn handle(&self, request: Request) -> Response;
+    async fn handle(&self, id: uuid::Uuid, request: Request) -> Response;
     async fn add_connection(&self, sender: Sender<Response>) -> uuid::Uuid;
     async fn remove_connection(&self, id: uuid::Uuid);
 }
@@ -102,7 +102,7 @@ where
 
                                 match message {
                                     Ok(message) => {
-                                        let response = hub.handle(message).await;
+                                        let response = hub.handle(connection_id, message).await;
                                         tx.send(response).ok();
                                     }
                                     Err(e) => {

@@ -5,6 +5,7 @@ use crate::{
     config::{self, Config},
     ws_server::WebSocketHandler,
 };
+use anyhow::Result;
 use messages::sink_management::{SinkRequest, SinkResponse};
 use messages::web_interface::{
     self, Action, ProblemDetails, QueryProviders, QueryResources, WebUiRequest, WebUiResponse,
@@ -17,7 +18,26 @@ type ResourceSender = Sender<ResourceProviderInterface>;
 type Providers = Vec<Box<dyn Provider + Sync + Send>>;
 type Resources = HashMap<uuid::Uuid, Resource>;
 type WebClients = HashMap<uuid::Uuid, Sender<WebUiResponse>>;
-type Sinks = HashMap<uuid::Uuid, Sender<SinkResponse>>;
+type Sinks = HashMap<uuid::Uuid, Sink>;
+
+enum Sink {
+    Registered(RegisteredSink),
+    Unregistered(Sender<SinkResponse>),
+}
+
+impl Sink {
+    fn send_to_registered(&self, msg: SinkResponse) -> Result<()> {
+        match self {
+            Sink::Registered(sink) => Ok(sink.sender.send(msg)?),
+            Sink::Unregistered(_) => Ok(()),
+        }
+    }
+}
+
+struct RegisteredSink {
+    sender: Sender<SinkResponse>,
+    name: String,
+}
 
 pub struct Hub {
     providers: RwLock<Providers>,
@@ -64,6 +84,24 @@ impl Hub {
         });
 
         (sender, handle)
+    }
+
+    async fn handle_query_sinks(&self) -> WebUiResponse {
+        let mut sinks = Vec::<web_interface::Sink>::new();
+
+        for (uid, sink) in self.sinks.read().await.iter() {
+            match sink {
+                Sink::Registered(sink) => {
+                    sinks.push(web_interface::Sink {
+                        uid: *uid,
+                        name: sink.name.clone(),
+                    });
+                }
+                _ => {}
+            }
+        }
+
+        WebUiResponse::Sinks(sinks)
     }
 
     async fn handle_query_providers(&self, _query: &QueryProviders) -> WebUiResponse {
@@ -118,8 +156,8 @@ impl Hub {
                         let msg = SinkResponse::Play(r.path.clone());
 
                         let sinks = self.sinks.read().await;
-                        let (_uid, sender) = sinks.iter().next().unwrap();
-                        sender.send(msg).expect("Message sent to sink");
+                        let (_uid, sink) = sinks.iter().next().unwrap();
+                        sink.send_to_registered(msg).expect("Message sent to sink");
                     }
                     None => {
                         log::debug!("Could not find a resource identified by {}", uid);
@@ -129,20 +167,28 @@ impl Hub {
             Action::Stop => {
                 let msg = SinkResponse::Stop;
                 let sinks = self.sinks.read().await;
-                let (_uid, sender) = sinks.iter().next().unwrap();
-                sender.send(msg).expect("Message sent to sink");
+                let (_uid, sink) = sinks.iter().next().unwrap();
+                sink.send_to_registered(msg).expect("Message sent to sink");
             }
             Action::Pause => {
                 let msg = SinkResponse::Pause;
                 let sinks = self.sinks.read().await;
-                let (_uid, sender) = sinks.iter().next().unwrap();
-                sender.send(msg).expect("Message sent to sink");
+                let (_uid, sink) = sinks.iter().next().unwrap();
+                sink.send_to_registered(msg).expect("Message sent to sink");
             }
         }
 
         WebUiResponse::Error(ProblemDetails {
             description: "Action not implemented".into(),
         })
+    }
+
+    async fn notify_web_clients(&self, msg: WebUiResponse) {
+        let web_clients = self.web_clients.read().await;
+
+        for (_, client) in web_clients.iter() {
+            client.send(msg.clone()).expect("Message sent to WebClient");
+        }
     }
 }
 
@@ -168,8 +214,9 @@ fn create_providers(config: &Config, resource_sender: ResourceSender) -> Provide
 
 #[async_trait::async_trait]
 impl WebSocketHandler<WebUiRequest, WebUiResponse> for Hub {
-    async fn handle(&self, req: WebUiRequest) -> WebUiResponse {
+    async fn handle(&self, _: uuid::Uuid, req: WebUiRequest) -> WebUiResponse {
         match req {
+            WebUiRequest::QuerySinks => self.handle_query_sinks().await,
             WebUiRequest::QueryProviders(q) => self.handle_query_providers(&q).await,
             WebUiRequest::QueryResources(q) => self.handle_query_resources(&q).await,
             WebUiRequest::Action(q) => self.handle_action(&q).await,
@@ -191,15 +238,48 @@ impl WebSocketHandler<WebUiRequest, WebUiResponse> for Hub {
 
 #[async_trait::async_trait]
 impl WebSocketHandler<SinkRequest, SinkResponse> for Hub {
-    async fn handle(&self, req: SinkRequest) -> SinkResponse {
-        log::debug!("{:?}", req);
+    async fn handle(&self, id: uuid::Uuid, req: SinkRequest) -> SinkResponse {
+        match req {
+            SinkRequest::Register { name } => {
+                let mut needs_notification = false;
+
+                {
+                    let mut sink_lock = self.sinks.write().await;
+                    let sink = sink_lock.get_mut(&id);
+                    if let Some(sink) = sink {
+                        match sink {
+                            Sink::Registered(_) => {
+                                // TODO: Incorrect state, disconnect
+                                todo!()
+                            }
+                            Sink::Unregistered(sender) => {
+                                *sink = Sink::Registered(RegisteredSink {
+                                    sender: sender.clone(),
+                                    name,
+                                });
+                                needs_notification = true;
+                            }
+                        }
+                    }
+                }
+
+                if needs_notification {
+                    self.notify_web_clients(self.handle_query_sinks().await)
+                        .await;
+                }
+            }
+        }
+
         SinkResponse::Dummy
     }
 
     async fn add_connection(&self, sender: Sender<SinkResponse>) -> uuid::Uuid {
         let uid = uuid::Uuid::new_v4();
         log::debug!("Adding new sink {}", uid);
-        self.sinks.write().await.insert(uid, sender);
+        self.sinks
+            .write()
+            .await
+            .insert(uid, Sink::Unregistered(sender));
         uid
     }
 
