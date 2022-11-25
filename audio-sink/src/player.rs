@@ -27,22 +27,18 @@ impl Player {
         });
 
         inner.connect_notify(Some("current-device"), |zelf, _| {
-            let current_device = zelf.property("current-device").unwrap();
-            use glib::GString;
-            debug!(
-                "current device changed: {:?}",
-                current_device.get::<GString>().unwrap().as_str()
-            );
+            let current_device = zelf.property::<String>("current-device");
+            debug!("current device changed: {:?}", current_device);
         });
 
         let pipeline = inner.pipeline();
-        pipeline.set_property("audio-sink", &sink)?;
+        pipeline.set_property("audio-sink", &sink);
 
         Ok(Self { inner, _sink: sink })
     }
 
     pub fn set_uri(&self, uri: &str) {
-        self.inner.set_uri(uri);
+        self.inner.set_uri(Some(uri));
     }
 
     pub fn play(&self) {
