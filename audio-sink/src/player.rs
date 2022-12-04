@@ -11,8 +11,11 @@ impl Player {
     pub fn new() -> Result<Self> {
         gstreamer::init()?;
 
-        let sink = gstreamer::ElementFactory::make("pulsesink", None)?;
-        let inner = gstreamer_player::Player::new(None, None);
+        let sink = gstreamer::ElementFactory::make("pulsesink").build()?;
+        let inner = gstreamer_player::Player::new(
+            gstreamer_player::PlayerVideoRenderer::NONE,
+            gstreamer_player::PlayerSignalDispatcher::NONE,
+        );
 
         inner.connect_error(|_, err| {
             error!("{:?}", err);

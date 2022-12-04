@@ -90,14 +90,11 @@ impl Hub {
         let mut sinks = Vec::<web_interface::Sink>::new();
 
         for (uid, sink) in self.sinks.read().await.iter() {
-            match sink {
-                Sink::Registered(sink) => {
-                    sinks.push(web_interface::Sink {
-                        uid: *uid,
-                        name: sink.name.clone(),
-                    });
-                }
-                _ => {}
+            if let Sink::Registered(sink) = sink {
+                sinks.push(web_interface::Sink {
+                    uid: *uid,
+                    name: sink.name.clone(),
+                });
             }
         }
 
@@ -114,7 +111,7 @@ impl Hub {
         let providers = self.providers.read().await;
         let providers = providers
             .iter()
-            .map(|ref v| web_interface::Provider {
+            .map(|v| web_interface::Provider {
                 name: v.get_name().to_string(),
             })
             .collect::<Vec<web_interface::Provider>>();
@@ -148,7 +145,7 @@ impl Hub {
         match query {
             Action::Play(uid) => {
                 let resources = self.resources.read().await;
-                let resource = resources.get(&uid);
+                let resource = resources.get(uid);
 
                 match resource {
                     Some(r) => {

@@ -89,7 +89,7 @@ async fn main() -> Result<()> {
         select! {
             Some(msg) = ws_read.next() => {
                 debug!("WebSocket message: {:?}", msg);
-                if let Err(_) = handle_hub_message(msg?, player.clone()).await {
+                if (handle_hub_message(msg?, player.clone()).await).is_err() {
                     break;
                 }
             }

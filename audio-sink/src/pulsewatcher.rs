@@ -11,7 +11,7 @@ use tokio::sync::mpsc::UnboundedSender as Sender;
 
 type PulseSender = Sender<PulseMessage>;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum PulseState {
     Connected,
     Disconnected,
